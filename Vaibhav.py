@@ -24,5 +24,6 @@ def fetch_google_news(query="technology"):
     return news_list
 
 news_data = fetch_google_news("politics")
+
 for news in news_data:
-    print(news["title"], "-", news["url"])
+    print(news)
