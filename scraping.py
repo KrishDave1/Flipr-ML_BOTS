@@ -1,46 +1,24 @@
 from transformers import pipeline
 
-# Initialize the summarization pipeline (BART)
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 tokenizer = summarizer.tokenizer
 
-# Explicitly set the tokenizer's maximum input length (for safety).
-# (Even if BART is pretrained with a fixed size, you can force a value.)
 tokenizer.model_max_length = 1024  
-MAX_CHUNK_TOKENS = 1200  # Maximum tokens per chunk for our recursive splitting.
-MIN_CHUNK_TOKENS = 600   # Minimum tokens each of the final two chunks should have.
-MIN_TOTAL_LAST = 2 * MIN_CHUNK_TOKENS  # At least 1200 tokens total for the last two chunks.
+MAX_CHUNK_TOKENS = 1200 
+MIN_CHUNK_TOKENS = 600
+MIN_TOTAL_LAST = 2 * MIN_CHUNK_TOKENS 
 
 def recursive_summarize(text, min_tokens=MIN_CHUNK_TOKENS, max_tokens=MAX_CHUNK_TOKENS):
-    """
-    Recursively summarizes the input text until it can fit in one chunk.
-    
-    Steps:
-      1. Tokenize the text.
-      2. If the total token count is <= max_tokens, return the text (base case).
-      3. Otherwise, split tokens into chunks:
-         - The first N chunks are full chunks of size max_tokens.
-         - The remaining tokens (the "last part") are split into two nearly equal chunks,
-           ensuring each is at least min_tokens. If the remainder is too small (< MIN_TOTAL_LAST),
-           one full chunk is pulled back to help.
-      4. Summarize each chunk individually.
-      5. Combine the summaries into one text and call recursive_summarize() on it.
-    """
-    # Tokenize the text (without adding special tokens)
     all_tokens = tokenizer.encode(text, add_special_tokens=False)
     total_tokens = len(all_tokens)
     print(f"Total tokens: {total_tokens}")
-    
-    # Base case: if the text is short enough, return it.
+
     if total_tokens <= max_tokens:
         return text
     
-    # Determine how many full chunks of size max_tokens we have.
     full_chunks = total_tokens // max_tokens
     remainder = total_tokens % max_tokens
     
-    # If remainder is less than needed to form two chunks (i.e. less than MIN_TOTAL_LAST)
-    # and we have at least one full chunk, pull one full chunk back.
     if full_chunks >= 1 and remainder < MIN_TOTAL_LAST:
         full_chunks -= 1
         start_last = full_chunks * max_tokens
@@ -48,22 +26,19 @@ def recursive_summarize(text, min_tokens=MIN_CHUNK_TOKENS, max_tokens=MAX_CHUNK_
     else:
         start_last = full_chunks * max_tokens
         last_tokens = all_tokens[start_last:]
-    
-    # Build the list of token chunks.
+
     chunks_tokens = []
-    # Add full chunks.
+
     for i in range(full_chunks):
         chunk = all_tokens[i * max_tokens : (i + 1) * max_tokens]
         chunks_tokens.append(chunk)
-    
-    # For the final tokens, split them into two nearly equal parts.
+
     last_total = len(last_tokens)
     split_index = last_total // 2
-    # Ensure each final chunk is at least min_tokens.
+
     if split_index < min_tokens or (last_total - split_index) < min_tokens:
         split_index = min_tokens
         if last_total - split_index < min_tokens:
-            # If even after adjustment the last part is too short, just add it as one chunk.
             chunks_tokens.append(last_tokens)
         else:
             chunks_tokens.append(last_tokens[:split_index])
@@ -72,20 +47,17 @@ def recursive_summarize(text, min_tokens=MIN_CHUNK_TOKENS, max_tokens=MAX_CHUNK_
         chunks_tokens.append(last_tokens[:split_index])
         chunks_tokens.append(last_tokens[split_index:])
     
-    # Decode token chunks back into text.
     chunks = [tokenizer.decode(chunk, skip_special_tokens=True) for chunk in chunks_tokens]
     print(f"Number of chunks: {len(chunks)}")
     for i, chunk in enumerate(chunks):
         chunk_len = len(tokenizer.encode(chunk, add_special_tokens=False))
         print(f"Chunk {i+1}: {chunk_len} tokens")
-    
-    # Summarize each chunk individually.
+
     chunk_summaries = []
     for i, chunk in enumerate(chunks):
         chunk_len = len(tokenizer.encode(chunk, add_special_tokens=False))
         print(f"\nSummarizing chunk {i+1}/{len(chunks)} (token length: {chunk_len})...")
         try:
-            # You can adjust max_length/min_length for the chunk summaries.
             summary_chunk = summarizer(
                 chunk,
                 max_length=600,
@@ -101,11 +73,9 @@ def recursive_summarize(text, min_tokens=MIN_CHUNK_TOKENS, max_tokens=MAX_CHUNK_
     combined_summary = " ".join(chunk_summaries)
     print("\nCombined Intermediate Summary:")
     print(combined_summary)
-    
-    # Recursively summarize the combined summary until it fits within one chunk.
+
     return recursive_summarize(combined_summary, min_tokens, max_tokens)
 
-# Example usage with provided texts:
 texts = ["""
 In a major step taken by the Uttar Pradesh Police Special Investigation Team (SIT) during the investigation of Sambhal violence, the police arrested close associate of auto thief and alleged mastermind of the November 24 Sambhal violence Shariq Sata on Thursday. Fugitive gangster Shariq Sata is on police radar for his suspected role in the violence. Last year, violence erupted in Sambhal over the court-ordered survey of a Mughal-era mosque, killing four people, officials said on Friday. 
 
