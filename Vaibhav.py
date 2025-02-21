@@ -1,24 +1,28 @@
 import requests
+from bs4 import BeautifulSoup
 
-API_KEY = "bc2a5562f82b45bd80f7fb88c0644020"
-NEWS_API_URL = "https://newsapi.org/v2/everything"  # Use 'everything' instead of 'top-headlines'
+def fetch_google_news(query="technology"):
+    url = f"https://news.google.com/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
+    headers = {"User-Agent": "Mozilla/5.0"}  # Prevent blocking
 
-def fetch_news(query="girls", language="en"):
-    params = {
-        "q": query,
-        "language": language,
-        "apiKey": API_KEY,
-        "sortBy": "publishedAt",  # Get recent news first
-        "pageSize": 45,  # Limit to 5 articles
-    }
-    response = requests.get(NEWS_API_URL, params=params)
-    
+    response = requests.get(url, headers=headers)
     if response.status_code != 200:
-        print("Error:", response.json())
+        print("Error:", response.status_code)
         return []
-    
-    return response.json().get("articles", [])
 
-news_data = fetch_news("girls", "en")
-for article in news_data:
-    print(article["title"], "-", article["url"])
+    soup = BeautifulSoup(response.text, "html.parser")
+    articles = soup.find_all("article")[0:1]  # Get top 5 news articles
+
+    news_list = []
+    for article in articles:
+        title_tag = article.find("a")
+        if title_tag:
+            title = title_tag.text.strip()
+            link = "https://news.google.com" + title_tag["href"][1:]
+            news_list.append({"title": title, "url": link})
+
+    return news_list
+
+news_data = fetch_google_news("politics")
+for news in news_data:
+    print(news["title"], "-", news["url"])
