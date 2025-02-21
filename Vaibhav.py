@@ -46,7 +46,7 @@ nlp = spacy.load("en_core_web_trf")
 
 
 # Sample text
-text = "Former Cornell University student sentenced for antisemitic threats"
+text = "Elon Musk to US Congressman Adam Schiff: You’re a criminal"
 
 # Process the text
 doc = nlp(text)
