@@ -322,25 +322,30 @@ def scraper(search_query:list):
     return candidate_articles
 
 # Get related articles => helper function
-def get_related_articles(start_id):
-    cypher_query = """
-    MATCH (start:Article) WHERE id(start) = $start_id
-    CALL apoc.path.expandConfig(start, {
-        relationshipFilter: 'IS_RELEATED_TO',
-        minLevel: 1,
-        maxLevel: 3,
-        uniqueness: 'NODE_GLOBAL'
-    }) 
-    YIELD path
-    WITH nodes(path) AS articles
-    UNWIND articles AS article
-    RETURN DISTINCT id(article) AS id, article.title AS title, 
-                    article.keywords AS keywords, article.content AS content
-    LIMIT 10;
-    """
-    with driver.session() as session:
-        result = session.run(cypher_query, start_id=start_id)
-        return [record.data() for record in result]
+def get_related_articles_content(start_id):
+        """
+        Retrieves the content of up to 10 articles related to the given article ID.
+        
+        :param start_id: The ID of the starting article.
+        :return: A list of article content.
+        """
+        query = """
+        MATCH (start:Article) WHERE id(start) = $start_id
+        CALL apoc.path.expandConfig(start, {
+            relationshipFilter: 'IS_RELATED_TO',
+            minLevel: 1,
+            maxLevel: 3,
+            uniqueness: 'NODE_GLOBAL'
+        }) 
+        YIELD path
+        WITH nodes(path) AS articles
+        UNWIND articles AS article
+        RETURN article.content AS content
+        LIMIT 10;
+        """
+        with driver.session() as session:
+            result = session.run(query, start_id=start_id)
+            return [record["content"] for record in result]
     
 # Get random article => helper function
     
@@ -385,15 +390,6 @@ def save_article(keywords, content, domain):
         record = result.single()
         return record["id"] if record else None
 
-@app.route("/related-articles", methods=["GET"])
-def related_articles():
-    start_id = request.args.get("start_id", type=int)
-    if start_id is None:
-        return jsonify({"error": "start_id is required"}), 400
-    
-    articles = get_related_articles(start_id)
-    return jsonify(articles)
-
 topic_dict = {
     0: "business",
     1: "sports",
@@ -408,12 +404,15 @@ def cronJob():
     hardcoded_query = "London " + topic_dict[topic_num] + " news" 
     articles = scraper([hardcoded_query])
     for article in articles:
-        # NER => 
         keywords = do_ner_and_extract_keywords(article["content"])
         saved_article_id = save_article(keywords=keywords, content=article["content"], domain=topic_dict[topic_num])
         create_relationships_by_keywords(article_id=saved_article_id, keywords_list=keywords)
 
-
+@app.route("/generate-summary", methods=['GET'])
+def generate_summary():
+    random_article_id = get_random_article()
+    neighbour_contents = get_related_articles_content(start_id=random_article_id)
+    # DO AHEAD
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
