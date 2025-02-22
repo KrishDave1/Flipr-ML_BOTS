@@ -405,7 +405,7 @@ topic_dict = {
 @app.route("/cronjob", methods=['GET'])
 def cronJob():
     topic_num:int = random.randrange(5)
-    hardcoded_query = "London" + topic_dict[topic_num] + "news" 
+    hardcoded_query = "London " + topic_dict[topic_num] + " news" 
     articles = scraper([hardcoded_query])
     for article in articles:
         # NER => 
