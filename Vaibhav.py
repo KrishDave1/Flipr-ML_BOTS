@@ -39,6 +39,35 @@ news_articles = [
         Fans are eagerly waiting to see how the final events unfold in the coming days."""
     }
 ]
+from transformers import pipeline
+
+# Load BART large model
+classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", framework="pt")
+
+# Example article
+title = "Government Approves New AI Regulations"
+content = "The government has introduced strict regulations for AI companies to ensure data privacy and ethical AI development."
+
+candidate_labels = [
+    "Politics", "Government", "Elections", "Foreign Policy", "Legislation",
+    "Economy", "Stock Market", "Business", "Inflation", "Trade", 
+    "Technology", "AI", "Cybersecurity", "Gadgets", "Space",
+    "Sports", "Football", "Cricket", "Olympics", "Tennis",
+    "Health", "Medicine", "Pandemic", "Mental Health", "Nutrition",
+    "Education", "Schools", "Universities", "Scholarships", "Research",
+    "Crime", "Law Enforcement", "Court Cases", "Scams", "Violence"
+]
+
+# Combine title and content for better classification
+text = f"{title}: {content}"
+
+# Perform classification
+result = classifier(text, candidate_labels, multi_label=True)
+
+# Print results
+for label, score in zip(result["labels"], result["scores"]):
+    print(f"{label}: {score:.4f}")
+
 import spacy
 
 # Load the pre-trained English NER model
