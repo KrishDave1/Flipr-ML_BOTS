@@ -32,7 +32,7 @@ public class Article {
 
     private List<String> keywords = new ArrayList<>();
     private String content;
-    private Domain domain;
+    private String domain;
 
     public void addArticle(Article article) {
         this.getRelated_Articles().add(article);
