@@ -40,6 +40,7 @@ from transformers import AutoTokenizer
     
 #     """Sambhal: The Uttar Pradesh Police's Special Investigation Team (SIT) on Thursday submitted chargesheets..."""
 # ]
+
 articles = [
      """India was one of the top nations in badminton only a few years ago, with players like PV Sindhu and Saina Nehwal securing golds year after year at multiple events, including the Olympics. However, over the past couple of years, India has failed to secure any major title, including a medal at the 2024 Paris Olympics. The downfall started when ace Indian shuttler PV Sindhu suffered an injury two years ago and has since struggled to regain her peak level after returning to the court in 2024. India has a long history of players picking up the baton from former greats — Sindhu herself replaced Nehwal as the country's top player. But now, the issue is that there is no pipeline of world-beating shuttlers after Sindhu. The results from the start of this year’s events highlight the trouble India now finds itself in. Disappointing start to the season
  
