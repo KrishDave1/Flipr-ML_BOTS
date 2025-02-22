@@ -27,7 +27,7 @@ public class Article {
     @GeneratedValue
     private Long id;
 
-    @Relationship(type = "IS_RELEATED_TO", direction = Relationship.Direction.OUTGOING)
+    @Relationship(type = "IS_RELATED_TO", direction = Relationship.Direction.OUTGOING)
     private List<Article> related_Articles = new ArrayList<>();
 
     private List<String> keywords = new ArrayList<>();
