@@ -72,8 +72,8 @@ def save_to_json(data, filename):
     print(f"Saved {len(data)} articles to {filename}")
 
 
-class MaharashtraNewsSpider(scrapy.Spider):
-    name = "maharashtra_news"
+class LondonNewsSpider(scrapy.Spider):
+    name = "london_news"
 
     custom_settings = {
         "DOWNLOAD_TIMEOUT": 10,
@@ -170,13 +170,13 @@ def ensure_minimum_articles():
         print(f"Only {len(articles)} articles found. Fetching more...")
         remaining = MIN_ARTICLES - len(articles)
         extra_articles = fetch_news_articles(
-            "Maharashtra Sports news", total_results=remaining
+            "London Sports news", total_results=remaining
         )
         save_to_json(extra_articles, "news_articles.json")
 
         # Run Scrapy again for extra links
         process = CrawlerProcess()
-        process.crawl(MaharashtraNewsSpider)
+        process.crawl(LondonNewsSpider)
         process.start()
 
         # Load new articles after running Scrapy again
@@ -192,12 +192,12 @@ def ensure_minimum_articles():
 
 if __name__ == "__main__":
     # Step 1: Fetch at least 50 article URLs
-    news_articles = fetch_news_articles("Maharashtra Sports news", total_results=50)
+    news_articles = fetch_news_articles("London Sports news", total_results=50)
     save_to_json(news_articles, "news_articles.json")
 
     # Step 2: Run Scrapy to scrape articles
     process = CrawlerProcess()
-    process.crawl(MaharashtraNewsSpider)
+    process.crawl(LondonNewsSpider)
     process.start()
 
     # Step 3: Ensure minimum articles are available
