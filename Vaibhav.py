@@ -39,32 +39,18 @@ news_articles = [
         Fans are eagerly waiting to see how the final events unfold in the coming days."""
     }
 ]
+import spacy
+
+# Load the pre-trained English NER model
+nlp = spacy.load("en_core_web_trf")
 
 
-# Load zero-shot classification pipeline
-classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+# Sample text
+text = "Olympics 2024: Historic Wins and Surprising Upsets"
 
-# Example news article
-title = "Government Announces New Policies for Economic Growth"
-content = "The government has introduced a new set of economic policies aimed at boosting GDP growth and reducing inflation."
-text = f"{title}: {content}"
+# Process the text
+doc = nlp(text)
 
-candidate_labels = [
-    "Politics", "Government", "Elections", "Foreign Policy", "Legislation",
-    "Economy", "Stock Market", "Business", "Inflation", "Trade", 
-    "Technology", "AI", "Cybersecurity", "Gadgets", "Space",
-    "Sports", "Football", "Cricket", "Olympics", "Tennis",
-    "Health", "Medicine", "Pandemic", "Mental Health", "Nutrition",
-    "Education", "Schools", "Universities", "Scholarships", "Research",
-    "Crime", "Law Enforcement", "Court Cases", "Scams", "Violence"
-]
-
-# Classify the news article
-for article in news_articles:
-    text = f"{article['title']}: {article['content']}"
-    result = classifier(text, candidate_labels, multi_label=True)
-
-    print(f"\n**Title:** {article['title']}")
-    print("Predicted Categories:")
-    for label, score in zip(result["labels"], result["scores"]):
-        print(f"  - {label}: {score:.4f}")
+# Print named entities, their labels, and explanations
+for ent in doc.ents:
+    print(f"{ent.text} -> {ent.label_} ({spacy.explain(ent.label_)})")
