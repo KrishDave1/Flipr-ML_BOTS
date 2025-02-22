@@ -11,7 +11,7 @@ from transformers import pipeline, AutoTokenizer, AutoModel
 from neo4j import GraphDatabase
 from scipy.spatial.distance import cosine
 import numpy as np
-
+import random
 # Summarizer starts
 
 from transformers import pipeline
@@ -110,7 +110,6 @@ def recursive_summarize(text, min_tokens=MIN_CHUNK_TOKENS, max_tokens=MAX_CHUNK_
     return recursive_summarize(combined_summary, min_tokens, max_tokens)
 
 # NER helper function
-
 def do_ner_and_extract_keywords(text:str) -> list:
     doc = nlp(text)
     keywords =  []
@@ -307,9 +306,9 @@ class NewsSpider(scrapy.Spider):
 
 # Scraping helper function
 
-def scraper():
+def scraper(search_query:list):
     # Aggregate candidate article URLs using both main and fallback queries.
-    all_queries = SEARCH_QUERIES + [FALLBACK_QUERY]
+    all_queries = search_query
     candidate_articles = aggregate_candidate_articles(all_queries, per_query=50)
     save_to_json(candidate_articles, "news_articles.json")
 
@@ -319,6 +318,8 @@ def scraper():
     process.start()
 
     print(f"Final extracted articles count: {count_extracted_articles()}")
+
+    return candidate_articles
 
 # Get related articles => helper function
 def get_related_articles(start_id):
@@ -355,6 +356,35 @@ def get_random_article():
         result = session.run(cypher_query)
         return result.single["article_id"] if result else None
     
+# Graph updation helper function
+def create_relationships_by_keywords(article_id, keywords_list):
+    """ Creates IS_RELATED_TO relationships between the given article_id and articles with matching keywords """
+    query = """
+    MATCH (source:Article) WHERE source.id = $article_id
+    MATCH (target:Article)
+    WHERE ANY(keyword IN target.keywords WHERE keyword IN $keywords_list) AND target.id <> $article_id
+    MERGE (source)-[:IS_RELATED_TO]->(target);
+    MERGE (target)-[:IS_RELATED_TO]->(source);
+    """
+    with driver.session() as session:
+        session.run(query, article_id=article_id, keywords_list=keywords_list)
+
+def save_article(keywords, content, domain):
+    """Saves an Article instance into Neo4j with an auto-generated ID and returns the ID."""
+    query = """
+    CREATE (a:Article {
+        title: $title,
+        keywords: $keywords,
+        content: $content,
+        domain: $domain
+    })
+    RETURN elementId(a) AS id;
+    """
+    with driver.session() as session:
+        result = session.run(query, keywords=keywords, content=content, domain=domain)
+        record = result.single()
+        return record["id"] if record else None
+
 @app.route("/related-articles", methods=["GET"])
 def related_articles():
     start_id = request.args.get("start_id", type=int)
@@ -363,6 +393,26 @@ def related_articles():
     
     articles = get_related_articles(start_id)
     return jsonify(articles)
+
+topic_dict = {
+    0: "business",
+    1: "sports",
+    2: "technology",
+    3: "politics",
+    4: "entertainment"
+}
+
+@app.route("/cronjob", methods=['GET'])
+def cronJob():
+    topic_num:int = random.randrange(5)
+    hardcoded_query = "London" + topic_dict[topic_num] + "news" 
+    articles = scraper([hardcoded_query])
+    for article in articles:
+        # NER => 
+        keywords = do_ner_and_extract_keywords(article["content"])
+        saved_article_id = save_article(keywords=keywords, content=article["content"], domain=topic_dict[topic_num])
+        create_relationships_by_keywords(article_id=saved_article_id, keywords_list=keywords)
+
 
 
 if __name__ == "__main__":
