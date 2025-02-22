@@ -5,11 +5,62 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
 
-sys.stdout.reconfigure(encoding='utf-8')
+def cluster_generator(articles):
+    sys.stdout.reconfigure(encoding='utf-8')
 
-model = SentenceTransformer('all-MiniLM-L6-v2')
+    model = SentenceTransformer('all-MiniLM-L6-v2')
 
-nlp = spacy.load("en_core_web_sm")
+    nlp = spacy.load("en_core_web_sm")
+
+    embeddings = model.encode(articles)
+    semantic_similarity_matrix = cosine_similarity(embeddings)
+
+    def extract_named_entities(text):
+        doc = nlp(text)
+        return set(ent.text.lower() for ent in doc.ents)
+
+    ner_sets = [extract_named_entities(article) for article in articles]
+
+    def jaccard_similarity(set1, set2):
+        union = set1.union(set2)
+        if not union:
+            return 0.0
+        return len(set1.intersection(set2)) / len(union)
+
+    num_articles = len(articles)
+    ner_similarity_matrix = np.zeros((num_articles, num_articles))
+    for i in range(num_articles):
+        for j in range(num_articles):
+            ner_similarity_matrix[i, j] = jaccard_similarity(ner_sets[i], ner_sets[j])
+
+    alpha = 0.7 
+    combined_similarity_matrix = alpha * semantic_similarity_matrix + (1 - alpha) * ner_similarity_matrix
+
+    combined_distance_matrix = 1 - combined_similarity_matrix
+
+    clustering = AgglomerativeClustering(
+        n_clusters=None, 
+        metric="precomputed", 
+        linkage="average",  
+        distance_threshold=0.5
+    )
+
+    labels = clustering.fit_predict(combined_distance_matrix)
+
+    clustered_articles = {}
+    for i, label in enumerate(labels):
+        clustered_articles.setdefault(label, []).append(articles[i])
+
+    print("\nClustered News Articles:")
+    clusters = [cluster for cluster_id, cluster in sorted(clustered_articles.items())]
+
+    print("Clustered News Articles:")
+    for i, cluster in enumerate(clusters):
+        print(f"\nCluster {i + 1}:")
+        for article in cluster:
+            print(f"- {article[:100]}...") 
+
+    return clusters
 
 articles = [
      """India was one of the top nations in badminton only a few years ago, with players like PV Sindhu and Saina Nehwal securing golds year after year at multiple events, including the Olympics. However, over the past couple of years, India has failed to secure any major title, including a medal at the 2024 Paris Olympics. The downfall started when ace Indian shuttler PV Sindhu suffered an injury two years ago and has since struggled to regain her peak level after returning to the court in 2024. India has a long history of players picking up the baton from former greats — Sindhu herself replaced Nehwal as the country's top player. But now, the issue is that there is no pipeline of world-beating shuttlers after Sindhu. The results from the start of this year’s events highlight the trouble India now finds itself in. Disappointing start to the season
@@ -188,49 +239,4 @@ Hamas has maintained that Shiri and her two children were killed in an Israeli a
 On Saturday, six more hostages will be returned by Hamas in exchange for more than 600 Palestinian prisoners. The ceasefire deal, which came into effect on January 19, has halted months of brutal fighting that killed 48,000 Palestinians in Gaza, triggering a humanitarian crisis."""
 ]
 
-embeddings = model.encode(articles)
-semantic_similarity_matrix = cosine_similarity(embeddings)
-
-def extract_named_entities(text):
-    doc = nlp(text)
-    return set(ent.text.lower() for ent in doc.ents)
-
-ner_sets = [extract_named_entities(article) for article in articles]
-
-def jaccard_similarity(set1, set2):
-    union = set1.union(set2)
-    if not union:
-        return 0.0
-    return len(set1.intersection(set2)) / len(union)
-
-num_articles = len(articles)
-ner_similarity_matrix = np.zeros((num_articles, num_articles))
-for i in range(num_articles):
-    for j in range(num_articles):
-        ner_similarity_matrix[i, j] = jaccard_similarity(ner_sets[i], ner_sets[j])
-
-alpha = 0.7 
-combined_similarity_matrix = alpha * semantic_similarity_matrix + (1 - alpha) * ner_similarity_matrix
-
-combined_distance_matrix = 1 - combined_similarity_matrix
-
-clustering = AgglomerativeClustering(
-    n_clusters=None, 
-    metric="precomputed", 
-    linkage="average",  
-    distance_threshold=0.5
-)
-
-labels = clustering.fit_predict(combined_distance_matrix)
-
-clustered_articles = {}
-for i, label in enumerate(labels):
-    clustered_articles.setdefault(label, []).append(articles[i])
-
-print("\nClustered News Articles:")
-for cluster_id, cluster in clustered_articles.items():
-    print(f"\nCluster {cluster_id + 1}:")
-    for article in cluster:
-        print(f"- {article[:100]}...") 
-
-ner_results = {article: list(extract_named_entities(article)) for article in articles}
+clusters = cluster_generator(articles)
