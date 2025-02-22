@@ -122,24 +122,107 @@ During the investigation, the police recovered foreign-made catridges from the v
 The violence erupted on November 24 last year in Sambhal during a court-ordered Archaeological Survey of India (ASI) survey of the Shahi Jama Masjid, a 500-year-old mosque in the district. The survey was initiated following claims that the mosque was constructed on the ruins of a Hindu temple allegedly demolished during the Mughal period.
 
 A total of 12 FIRs were registered in connection with the violence. The SIT is investigating all the FIRs. Notably, bullets "manufactured in Pakistan and the US" were recovered from the spot.
+""",
+
 """
+The family of Israeli hostage Shiri Bibas says a body handed over by Hamas on Friday is hers.
+
+"Our Shiri was murdered in captivity and has now returned home," the family said in a statement. Israel's forensic officials who have been examining the body are yet to confirm the identification.
+
+Remains handed over by Hamas on Thursday which it said were those of Shiri Bibas turned out to be an unidentified woman, Israel said.
+
+It comes as six living hostages are handed over by Hamas on Saturday as part of a ceasefire deal. More than 600 Palestinian prisoners will be freed by Israel in exchange.
+
+Follow updates on the hostages release
+Family mourns 'man of peace' as body returned
+Return of bodies marks day of anguish for Israel
+The Bibas family said: "For 16 months, we sought certainty, and now that we have it, there is no comfort in it, but we hope for the beginning of a closure."
+
+Hamas previously said the mother and her two children were killed in an Israeli air strike.
+
+Earlier, a senior Hamas official confirmed to the BBC that the handover of the new body from Hamas to the Red Cross had taken place on Friday evening.
+
+Israel had accused Hamas of breaking the terms of the ceasefire deal after forensic testing showed the remains handed over on Thursday were not that of Shiri Bibas.
+
+The bodies of her sons, Ariel and Kfir, were returned to Israel, as was that of another hostage, Oded Lifschitz.
+
+Hamas spokesman Ismail al-Thawabta said in a post on X on Friday that Shiri's remains seemed to have been mixed up with other bodies under rubble after the air strike.
+
+Israel has disputed the claim that Ariel and Kfir Bibas were killed in an airstrike, with Israel Defense Forces (IDF) spokesman Daniel Hagari telling a press conference "forensic findings", which have not been seen by the BBC, suggested the boys had been killed "deliberately".
+
+He said evidence had been shared with "partners around the world so they can verify it".
+
+Shiri, Ariel and Kfir Bibas were aged 32, four and nine months respectively when they were kidnapped during the Hamas attacks on Israel on 7 October 2023.
+
+They were taken hostage along with the children's father, Yarden Bibas, 34, who was released alive by Hamas on 1 February.
+
+Under the first phase of a ceasefire deal, which began on 19 January and lasts for 42 days, Hamas agreed to hand over 33 hostages in return for Israel freeing 1,900 Palestinian prisoners.
+
+On Saturday, the armed group released Eliya Cohen, 27, Omer Shem Tov, 22, Tal Shohan, 40, and 23-year-old Omer Wenkert - all of whom were taken during the 7 October attacks.
+
+Ethiopian-Israeli Avera Mengitsu, who was captured by Hamas in 2014, was also released. Hisham al-Sayed, a Bedouin Arab-Israeli held in Gaza since 2015, will be handed over separately. Israel is due to free 602 Palestinian prisoners.
+
+In subsequent stages of the agreement, Hamas will release the remaining living hostages from Gaza and return the bodies of dead hostages. Israel has pledged to release more Palestinian prisoners.
+
+In the 7 October attacks, about 1,200 people - mostly civilians - were killed and 251 others taken back to Gaza as hostages.
+
+In response, Israel launched a massive military campaign against Hamas which has killed at least 48,319 Palestinians - mainly civilians - according to the Hamas-run Gaza health ministry.
+
+""",
+"""
+The body handed over to Israel by Palestinian terror outfit Hamas on Friday has been confirmed to be that of hostage Shiri Bibas, her family said in a statement on Saturday. The development comes amid widespread outrage in Israel after the body returned earlier this week by Hamas, which it claimed to be that of Shiri Bibas, turned out to be someone else.
+
+The 32-year-old mother of two had come to symbolise the ordeal of hostages taken by Hamas during its October 7, 2023, offensive.
+
+"After the identification process, we received the news this morning that we had feared: our Shiri was murdered in captivity... She has returned home to her sons, her husband, her sister, and all her family to rest," a statement by the Bibas family said.
+
+Shiri's husband, Yarden Bibas, was released by Hamas earlier this month after being in captivity for 484 days. On Thursday, Hamas handed over four bodies as part of a ceasefire deal that has paused the brutal war in Gaza.
+
+The Palestinian outfit claimed the bodies were of Shiri, her two young sons, Kfir and Ariel, and another captive, Oded Lifshitz. However, forensic tests by Israeli authorities found the body to be not of Shiri Bibas, prompting outrage in the Jewish nation and concerns about the deal being upended.
+An irate Israeli Prime Minister Benjamin Netanyahu said he would make "Hamas pay" for not returning the body of Shiri. In a hard-hitting video statement, Netanyahu said, "We will act with determination to bring Shiri home along with all our hostages - both living and dead - and ensure Hamas pays the full price for this cruel and evil violation of the agreement."
+
+On Friday, Hamas released another body, which was confirmed to be of Shiri. The outfit said it had been "mistakenly mixed" with others who were buried under the rubble in Gaza.
+
+Hamas has maintained that Shiri and her two children were killed in an Israeli airstrike in Gaza - a claim dismissed by Israel.
+
+On Saturday, six more hostages will be returned by Hamas in exchange for more than 600 Palestinian prisoners. The ceasefire deal, which came into effect on January 19, has halted months of brutal fighting that killed 48,000 Palestinians in Gaza, triggering a humanitarian crisis."""
 ]
 
 embeddings = model.encode(articles)
+semantic_similarity_matrix = cosine_similarity(embeddings)
 
-### Step 2: Compute Cosine Similarity ###
-similarity_matrix = cosine_similarity(embeddings)
+def extract_named_entities(text):
+    doc = nlp(text)
+    return set(ent.text.lower() for ent in doc.ents)
 
-### Step 3: Apply Agglomerative Clustering ###
+ner_sets = [extract_named_entities(article) for article in articles]
+
+def jaccard_similarity(set1, set2):
+    union = set1.union(set2)
+    if not union:
+        return 0.0
+    return len(set1.intersection(set2)) / len(union)
+
+num_articles = len(articles)
+ner_similarity_matrix = np.zeros((num_articles, num_articles))
+for i in range(num_articles):
+    for j in range(num_articles):
+        ner_similarity_matrix[i, j] = jaccard_similarity(ner_sets[i], ner_sets[j])
+
+alpha = 0.7 
+combined_similarity_matrix = alpha * semantic_similarity_matrix + (1 - alpha) * ner_similarity_matrix
+
+combined_distance_matrix = 1 - combined_similarity_matrix
+
 clustering = AgglomerativeClustering(
     n_clusters=None, 
     metric="precomputed", 
     linkage="average",  
-    distance_threshold=0.3 
+    distance_threshold=0.5
 )
-labels = clustering.fit_predict(1 - similarity_matrix)  # Convert similarity to distance
 
-### Step 4: Display Clusters ###
+labels = clustering.fit_predict(combined_distance_matrix)
+
 clustered_articles = {}
 for i, label in enumerate(labels):
     clustered_articles.setdefault(label, []).append(articles[i])
@@ -148,11 +231,6 @@ print("\nClustered News Articles:")
 for cluster_id, cluster in clustered_articles.items():
     print(f"\nCluster {cluster_id + 1}:")
     for article in cluster:
-        print(f"- {article[:100]}...")  # Print first 100 characters
+        print(f"- {article[:100]}...") 
 
-### Step 5: Named Entity Recognition (NER) ###
-def extract_named_entities(text):
-    doc = nlp(text)
-    return [(ent.text, ent.label_) for ent in doc.ents]
-
-ner_results = {article: extract_named_entities(article) for article in articles}
+ner_results = {article: list(extract_named_entities(article)) for article in articles}
