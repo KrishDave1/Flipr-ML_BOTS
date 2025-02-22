@@ -1,45 +1,8 @@
-import numpy as np
-from sklearn.cluster import AgglomerativeClustering
 from sentence_transformers import SentenceTransformer
-from transformers import pipeline
-from transformers import AutoTokenizer
+from sklearn.cluster import AgglomerativeClustering
+from transformers import pipeline, AutoTokenizer
 
 
-
-# Sample news articles with varied topics
-
-# Sample news articles with 2 similar subtopics & 2 distinct ones
-# articles = [
-#     """LeBron James led the Lakers to a 115-108 victory over the Boston Celtics. 
-#     Scoring 32 points with 10 assists, he showcased his dominance. 
-#     The Celtics, despite a strong start, struggled with turnovers in the second half, 
-#     allowing the Lakers to secure a crucial comeback win.""",  # Sports - NBA
-
-#     """The Kansas City Chiefs secured a dramatic overtime win in the Super Bowl against the San Francisco 49ers. 
-#     Patrick Mahomes orchestrated a game-winning drive in the final moments, sealing his legacy as one of the greatest quarterbacks. 
-#     The thrilling finish left fans in awe.""",  # Sports - NFL (same subtopic: Sports)
-
-#     """The U.S. Senate has approved a $1.2 trillion infrastructure bill aimed at modernizing roads, bridges, and broadband. 
-#     The bipartisan legislation is expected to create jobs, but critics warn of excessive government spending. 
-#     President Biden hailed it as a transformative step for America's future.""",  # Politics
-
-#     """The highly anticipated sequel to 'Dune' premiered last night to widespread acclaim. 
-#     Critics praised Denis Villeneuve's breathtaking visuals and Timothée Chalamet's performance. 
-#     The film is already being considered a strong contender for multiple Oscar nominations.""",  # Entertainment
-# ]
-# articles = [
-#     """India was one of the top nations in badminton only a few years ago, with players like PV Sindhu and Saina Nehwal securing golds year after year at multiple events, including the Olympics...""",
-    
-#     """Indian badminton star PV Sindhu has officially withdrawn from the 2025 Badminton Asia Mixed Team Championships (BAMTC)...""",
-    
-#     """The 2025 Badminton Asia Mixed Team Championships saw multiple top players withdraw due to injuries...""",
-    
-#     """The stock market experienced a major downturn, with tech companies losing significant value...""",
-    
-#     """Fugitive gangster Shariq Sata is on police radar for his suspected role in the violence that erupted...""",
-    
-#     """Sambhal: The Uttar Pradesh Police's Special Investigation Team (SIT) on Thursday submitted chargesheets..."""
-# ]
 
 articles = [
      """India was one of the top nations in badminton only a few years ago, with players like PV Sindhu and Saina Nehwal securing golds year after year at multiple events, including the Olympics. However, over the past couple of years, India has failed to secure any major title, including a medal at the 2024 Paris Olympics. The downfall started when ace Indian shuttler PV Sindhu suffered an injury two years ago and has since struggled to regain her peak level after returning to the court in 2024. India has a long history of players picking up the baton from former greats — Sindhu herself replaced Nehwal as the country's top player. But now, the issue is that there is no pipeline of world-beating shuttlers after Sindhu. The results from the start of this year’s events highlight the trouble India now finds itself in. Disappointing start to the season
@@ -156,8 +119,6 @@ A total of 12 FIRs were registered in connection with the violence. The SIT is i
 ]
 
 
-
-
 # Step 1: Convert Articles into Embeddings
 model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')  # More accurate model for long texts
 embeddings = model.encode(articles, normalize_embeddings=True)
@@ -173,35 +134,32 @@ for i, label in enumerate(labels):
 
 # Step 4: Generate Subtopic Names
 subtopic_names = {}
-# for cluster, grouped_articles in subtopic_clusters.items():
-   
-
-
-# subtopic_clusters = {}
-# for i, label in enumerate(labels):
-#     subtopic_clusters.setdefault(label, []).append(articles[i])
-
-# Print clusters before summarizing
-print("\n### Clustered Articles ###\n")
 for cluster, grouped_articles in subtopic_clusters.items():
-    print(f"Cluster {cluster}:")
-    subtopic_names[cluster] = grouped_articles[0][:50] + "..."  # Take first few words for naming
+    subtopic_names[cluster] = grouped_articles[0][:50] + "..."  # Use first few words of first article as heading
+
+# Step 5: Print Clusters Before Summarization
+print("\n### Clustered Articles Before Summarization ###\n")
+for cluster, grouped_articles in subtopic_clusters.items():
+    subtopic_heading = subtopic_names[cluster]
+    print(f"**Subtopic:** {subtopic_heading}")
+    print("Articles in this cluster:")
     for article in grouped_articles:
-        print(f"- {article[:100]}...")  # Print the first 100 characters for readability
+        print(f"- {article[:100]}...")  # Print first 100 characters for readability
     print("\n" + "-"*80 + "\n")
-# Step 5: Summarize Each Cluster
-# summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
-# subtopic_summaries = {}
-# for cluster, grouped_articles in subtopic_clusters.items():
-#     combined_text = " ".join(grouped_articles)  # Merge articles under one subtopic
-#     summary = summarizer(combined_text, max_length=200, min_length=100, do_sample=False)  # Longer summaries
-#     tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
-#     tokens = tokenizer(combined_text, truncation=True, max_length=1024, return_tensors="pt")
-#     subtopic_summaries[subtopic_names[cluster]] = summary[0]['summary_text']
+# Step 6: Summarize Each Cluster
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
 
-# # Print the results
-# print("\n### Topic: Various News Categories ###\n")
-# for subtopic, summary in subtopic_summaries.items():
-#     print(f"**Subtopic:** {subtopic}")
-#     print(f"**Summary:** {summary}\n")
+subtopic_summaries = {}
+for cluster, grouped_articles in subtopic_clusters.items():
+    combined_text = " ".join(grouped_articles)  # Merge articles under one subtopic
+    tokens = tokenizer(combined_text, truncation=True, max_length=1024, return_tensors="pt")
+    summary = summarizer(combined_text, max_length=200, min_length=100, do_sample=False)  # Longer summaries
+    subtopic_summaries[subtopic_names[cluster]] = summary[0]['summary_text']
+
+# Step 7: Print Final Summaries
+print("\n### Topic: Various News Categories ###\n")
+for subtopic, summary in subtopic_summaries.items():
+    print(f"**Subtopic:** {subtopic}")
+    print(f"**Summary:** {summary}\n")
