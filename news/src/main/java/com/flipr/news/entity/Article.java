@@ -32,7 +32,6 @@ public class Article {
 
     private List<String> keywords = new ArrayList<>();
     private String content;
-    private String title;
     private Domain domain;
 
     public void addArticle(Article article) {

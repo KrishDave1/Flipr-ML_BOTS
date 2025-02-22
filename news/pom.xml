@@ -75,6 +75,16 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+
+
 		<!-- Apache Commons Lang3 Dependency (Utility functions) -->
 		<dependency>
 			<groupId>org.apache.commons</groupId>
