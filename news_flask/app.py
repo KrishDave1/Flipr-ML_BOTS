@@ -107,6 +107,8 @@ def recursive_summarize(text, min_tokens=MIN_CHUNK_TOKENS, max_tokens=MAX_CHUNK_
 
     return recursive_summarize(combined_summary, min_tokens, max_tokens)
 
+# NER helper function
+
 def do_ner_and_extract_keywords(text:str) -> list:
     doc = nlp(text)
     keywords =  []
