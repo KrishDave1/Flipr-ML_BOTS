@@ -135,7 +135,7 @@ clustering = AgglomerativeClustering(
     n_clusters=None, 
     metric="precomputed", 
     linkage="average",  
-    distance_threshold=0.4 
+    distance_threshold=0.3 
 )
 labels = clustering.fit_predict(1 - similarity_matrix)  # Convert similarity to distance
 
