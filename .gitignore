@@ -1,3 +1,4 @@
 *.pyc
 flipr-env/
+fliprenv
 london_scraper.py
