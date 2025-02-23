@@ -446,6 +446,77 @@ def generate_summary():
             print("\n" + "-"*80 + "\n")
 
     # DO AHEAD
+    def recursive_summarize(text, min_tokens=MIN_CHUNK_TOKENS, max_tokens=MAX_CHUNK_TOKENS):
+        all_tokens = tokenizer.encode(text, add_special_tokens=False)
+        total_tokens = len(all_tokens)
+        print(f"Total tokens: {total_tokens}")
+
+        if total_tokens <= max_tokens:
+            return text
+        
+        full_chunks = total_tokens // max_tokens
+        remainder = total_tokens % max_tokens
+        
+        if full_chunks >= 1 and remainder < MIN_TOTAL_LAST:
+            full_chunks -= 1
+            start_last = full_chunks * max_tokens
+            last_tokens = all_tokens[start_last:]
+        else:
+            start_last = full_chunks * max_tokens
+            last_tokens = all_tokens[start_last:]
+
+        chunks_tokens = []
+
+        for i in range(full_chunks):
+            chunk = all_tokens[i * max_tokens : (i + 1) * max_tokens]
+            chunks_tokens.append(chunk)
+
+        last_total = len(last_tokens)
+        split_index = last_total // 2
+
+        if split_index < min_tokens or (last_total - split_index) < min_tokens:
+            split_index = min_tokens
+            if last_total - split_index < min_tokens:
+                chunks_tokens.append(last_tokens)
+            else:
+                chunks_tokens.append(last_tokens[:split_index])
+                chunks_tokens.append(last_tokens[split_index:])
+        else:
+            chunks_tokens.append(last_tokens[:split_index])
+            chunks_tokens.append(last_tokens[split_index:])
+        
+        chunks = [tokenizer.decode(chunk, skip_special_tokens=True) for chunk in chunks_tokens]
+        print(f"Number of chunks: {len(chunks)}")
+        for i, chunk in enumerate(chunks):
+            chunk_len = len(tokenizer.encode(chunk, add_special_tokens=False))
+            print(f"Chunk {i+1}: {chunk_len} tokens")
+
+        chunk_summaries = []
+        for i, chunk in enumerate(chunks):
+            chunk_len = len(tokenizer.encode(chunk, add_special_tokens=False))
+            print(f"\nSummarizing chunk {i+1}/{len(chunks)} (token length: {chunk_len})...")
+            try:
+                summary_chunk = summarizer(
+                    chunk,
+                    max_length=600,
+                    min_length=400,
+                    do_sample=False,
+                    truncation=True
+                )
+                chunk_summaries.append(summary_chunk[0]['summary_text'])
+            except Exception as e:
+                print(f"Error summarizing chunk {i+1}: {e}")
+                chunk_summaries.append(chunk)
+        
+        combined_summary = " ".join(chunk_summaries)
+        print("\nCombined Intermediate Summary:")
+        print(combined_summary)
+
+        return recursive_summarize(combined_summary, min_tokens, max_tokens)
+
+    recursive_summarize(" ".join(articles))
+# Step 6: Generate Summaries
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
