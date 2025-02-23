@@ -416,7 +416,7 @@ def cronJob():
 def generate_summary():
     random_article_id = get_random_article()
     neighbour_contents = get_related_articles_content(start_id=random_article_id)
-    
+    articles=neighbour_contents
 # Step 1: Convert Articles into Embeddings
     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')  # More accurate model for long texts
     embeddings = model.encode(articles, normalize_embeddings=True)
@@ -444,6 +444,9 @@ def generate_summary():
         for article in grouped_articles:
             print(f"- {article[:100]}...")  # Print first 100 characters for readability
             print("\n" + "-"*80 + "\n")
+
+
+# Step 6: Summarize Each Cluster
 
     # DO AHEAD
 

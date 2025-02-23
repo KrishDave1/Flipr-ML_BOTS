@@ -49,13 +49,35 @@ title = "Government Approves New AI Regulations"
 content = "The government has introduced strict regulations for AI companies to ensure data privacy and ethical AI development."
 
 candidate_labels = [
-    "Politics", "Government", "Elections", "Foreign Policy", "Legislation",
-    "Economy", "Stock Market", "Business", "Inflation", "Trade", 
-    "Technology", "AI", "Cybersecurity", "Gadgets", "Space",
-    "Sports", "Football", "Cricket", "Olympics", "Tennis",
-    "Health", "Medicine", "Pandemic", "Mental Health", "Nutrition",
-    "Education", "Schools", "Universities", "Scholarships", "Research",
-    "Crime", "Law Enforcement", "Court Cases", "Scams", "Violence"
+     "Politics","Government", "Elections", "Foreign Policy", "Legislation", "Political Parties", 
+    "Political Debates", "Protests & Movements", "Public Policy", "Corruption", "Political Scandals",
+    
+    "Economy","Stock Market", "Business", "Inflation", "Trade", "Economic Policies", 
+    "GDP & Growth Rate", "Unemployment", "Banking & Finance", "Real Estate", "International Trade",
+    
+    "Technology","AI", "Cybersecurity", "Gadgets", "Space Exploration", "Internet & Connectivity", 
+    "Robotics", "Blockchain & Cryptocurrency", "Quantum Computing", "Software & Programming", "5G & Telecommunications",
+    
+    "Sports","Cricket", "Football", "Tennis", "Badminton", "Olympics", 
+    "Basketball", "Athletics", "Hockey", "Golf", "Wrestling",
+    
+     "Health","Medicine", "Pandemic", "Mental Health", "Nutrition", "Fitness & Exercise", 
+    "Healthcare Policies", "Diseases & Vaccines", "Alternative Medicine", "Public Health", "Medical Research",
+    
+      "Education","Schools", "Universities", "Scholarships", "Research", "Online Learning", 
+    "Examinations & Results", "Student Loans", "Educational Policies", "Teaching Methods", "EdTech",
+    
+    "Crime","Law Enforcement", "Court Cases", "Scams & Frauds", "Violence", "Cybercrime", 
+    "White-Collar Crime", "Drug Trafficking", "Kidnapping", "Human Trafficking", "Organized Crime",
+    
+     "Business & Finance","Startups", "Corporate News", "Mergers & Acquisitions", "Real Estate Market", "E-commerce", 
+    "Small Businesses", "Investment Strategies", "Taxation Policies", "Supply Chain & Logistics", "Financial Scandals",
+    
+    "Environment & Climate","Climate Change", "Renewable Energy", "Deforestation", "Wildlife Conservation", "Pollution & Air Quality", 
+    "Ocean & Marine Life", "Natural Disasters", "Sustainable Development", "Carbon Emissions", "Water Crisis",
+    
+    "Science & Space","Space Exploration", "Astronomy", "Physics", "Biology & Genetics", "Chemistry", 
+    "Scientific Discoveries", "AI in Science", "Renewable Energy Technologies", "Geology & Earth Science", "Research & Innovations"
 ]
 
 # Combine title and content for better classification
