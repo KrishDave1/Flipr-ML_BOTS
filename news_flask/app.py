@@ -3,6 +3,9 @@ import json
 import os
 import scrapy
 from scrapy.crawler import CrawlerProcess
+from scrapy.crawler import CrawlerRunner
+from twisted.internet import reactor, defer
+from scrapy.utils.log import configure_logging
 from newspaper import Article
 from time import sleep
 import spacy
@@ -13,10 +16,17 @@ from scipy.spatial.distance import cosine
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import AgglomerativeClustering
 from transformers import pipeline, AutoTokenizer
-
+from gensim.models import KeyedVectors
+from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModel
+import torch
 import numpy as np
 import random
+import re
 # Summarizer starts
+
+from sentence_transformers import SentenceTransformer
+model_sentence_transformer = SentenceTransformer("all-mpnet-base-v2")
 
 from transformers import pipeline
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
@@ -119,7 +129,7 @@ def do_ner_and_extract_keywords(text:str) -> list:
     keywords =  []
     for ent in doc.ents:
         print(f"{ent.text} -> {ent.label_} ({spacy.explain(ent.label_)})")
-        keywords.append(ent.label_)
+        keywords.append(ent.text)
     return keywords
 
 
@@ -142,7 +152,7 @@ FALLBACK_QUERY = "London in-depth analysis"
 
 
 # ---------------- Helper Functions ---------------- #
-def fetch_news_articles(query, total_results=50):
+def fetch_news_articles(query, total_results=10):
     """
     Fetch candidate news articles from NewsAPI.
     Restricts results to trusted sources.
@@ -182,7 +192,7 @@ def fetch_news_articles(query, total_results=50):
     return candidate_articles
 
 
-def aggregate_candidate_articles(queries, per_query=50):
+def aggregate_candidate_articles(queries, per_query=10):
     """Aggregate candidate articles from multiple search queries and deduplicate by URL."""
     all_candidates = []
     for query in queries:
@@ -261,12 +271,15 @@ class NewsSpider(scrapy.Spider):
 
         news_data = load_json(json_file)
 
+        request_count = 0  # Debugging count
         for item in news_data:
             url = item.get("link")
             if url and is_url_accessible(url):
                 yield scrapy.Request(
                     url, callback=self.parse_article, errback=self.handle_failure
                 )
+
+        self.logger.info(f"Total requests sent: {request_count}")
 
     def parse_article(self, response):
         try:
@@ -310,20 +323,32 @@ class NewsSpider(scrapy.Spider):
 
 # Scraping helper function
 
-def scraper(search_query:list):
+def scraper(search_query: list):
     # Aggregate candidate article URLs using both main and fallback queries.
     all_queries = search_query
     candidate_articles = aggregate_candidate_articles(all_queries, per_query=50)
     save_to_json(candidate_articles, "news_articles.json")
 
-    # Run the Scrapy spider to extract full article content (all crawls in one reactor run)
-    process = CrawlerProcess()
-    process.crawl(NewsSpider)
-    process.start()
+    # Configure logging to prevent duplicate logs
+    configure_logging()
+    
+    # Use CrawlerRunner instead of CrawlerProcess
+    runner = CrawlerRunner()
 
-    print(f"Final extracted articles count: {count_extracted_articles()}")
-
-    return candidate_articles
+    @defer.inlineCallbacks
+    def crawl():
+        yield runner.crawl(NewsSpider)
+        print(f"Final extracted articles count: {count_extracted_articles()}")
+        reactor.stop()
+    
+    # Ensure we don't restart the reactor
+    if reactor.running:
+        return runner.join().addCallback(lambda _: candidate_articles)
+    else:
+        crawl()
+        reactor.run()
+    
+    return load_json("extracted_articles.json")
 
 # Get related articles => helper function
 def get_related_articles_content(start_id):
@@ -365,15 +390,24 @@ def get_random_article():
         result = session.run(cypher_query)
         return (result.single["article_id"], result.single["domain"]) if result else None
     
-# Graph updation helper function
+# Graph updation
 def create_relationships_by_keywords(article_id, keywords_list):
+    print("In the create relationships by keywords function.")
     """ Creates IS_RELATED_TO relationships between the given article_id and articles with matching keywords """
     query = """
-    MATCH (source:Article) WHERE source.id = $article_id
+    MATCH (source:Article {id: $article_id})
     MATCH (target:Article)
-    WHERE ANY(keyword IN target.keywords WHERE keyword IN $keywords_list) AND target.id <> $article_id
-    MERGE (source)-[:IS_RELATED_TO]->(target);
-    MERGE (target)-[:IS_RELATED_TO]->(source);
+    WHERE target.id <> $article_id
+
+    // Compute cosine similarity
+    WITH source, target, 
+        gds.similarity.cosine(source.keywords, target.keywords) AS similarity
+
+    // Set a similarity threshold (e.g., 0.8 for strong similarity)
+    WHERE similarity > -1
+
+    // Create bidirectional relationship based on similarity
+    MERGE (source)-[:IS_RELATED_TO {similarity: similarity}]-(target);
     """
     with driver.session() as session:
         session.run(query, article_id=article_id, keywords_list=keywords_list)
@@ -382,7 +416,6 @@ def save_article(keywords, content, domain):
     """Saves an Article instance into Neo4j with an auto-generated ID and returns the ID."""
     query = """
     CREATE (a:Article {
-        title: $title,
         keywords: $keywords,
         content: $content,
         domain: $domain
@@ -408,21 +441,242 @@ topic_dict = {
     10: "science"
 }
 
-@app.route("/cronjob", methods=['GET'])
-def cronJob():
-    topic_num:int = random.randrange(5)
-    hardcoded_query = "London " + topic_dict[topic_num] + " news" 
-    articles = scraper([hardcoded_query])
-    for article in articles:
-        keywords = do_ner_and_extract_keywords(article["content"])
-        saved_article_id = save_article(keywords=keywords, content=article["content"], domain=topic_dict[topic_num])
-        create_relationships_by_keywords(article_id=saved_article_id, keywords_list=keywords)
+# @app.route("/")
+# def home():
+#     return "<h1>HELLO</h1>"
 
-@app.route("/generate-summary", methods=['GET'])
-def generate_summary():
-    random_article_id, random_article_domain = get_random_article()
-    neighbour_contents = get_related_articles_content(start_id=random_article_id)
-    articles=neighbour_contents
+# @app.route("/cronjob", methods=['GET'])
+# def cronJob():
+#     print("Entered cron job.")
+#     topic_num:int = random.randrange(5)
+#     hardcoded_query = "London " + topic_dict[topic_num] + " news" 
+#     articles = scraper([hardcoded_query])
+#     print("Done with scraping.")
+#     print(f"ARTICLES {len(articles)}")
+#     count = 0
+#     for article in articles:
+#         count += 1
+#         print(f"COUNT = {count}")
+#         keywords = do_ner_and_extract_keywords(article.get("content"))
+#         keywords_to_para = ""
+#         for k in keywords:
+#             keywords_to_para = keywords_to_para + " " + k
+#         keywords_to_para = keywords_to_para.strip()
+#         keywords_to_para = re.sub(r"[^a-zA-Z0-9\s]", "", keywords_to_para)
+#         # if not keywords_to_para.strip():
+#         #     print("Warning: Empty input to tokenizer!")
+#         #     continue
+#         # inputs = tokenizer(keywords_to_para, return_tensors="pt", truncation=True, padding=True, max_length=512)
+#         # print(f"Tokenizer output: {inputs}")
+#         # # Generate embeddings
+#         # with torch.no_grad():
+#         #     outputs = model_sentence_transformer(**inputs)
+#         # # Use CLS token embedding
+#         # para_embedding = outputs.last_hidden_state[:, 0, :].squeeze().numpy()
+#         para_embedding = model_sentence_transformer.encode(keywords_to_para)
+#         saved_article_id = save_article(keywords=para_embedding, content=article.get("content"), domain=topic_dict[topic_num])
+#         create_relationships_by_keywords(article_id=saved_article_id, keywords_list=para_embedding)
+#     return jsonify({
+#         "message": "HELLO FROM FLASK."
+#     })
+
+# @app.route("/generate-summary", methods=['GET'])
+# def generate_summary():
+#     random_article_id, random_article_domain = get_random_article()
+#     neighbour_contents = get_related_articles_content(start_id=random_article_id)
+#     articles=neighbour_contents
+#     # Step 1: Convert Articles into Embeddings
+#     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
+#     embeddings = model.encode(articles, normalize_embeddings=True)
+
+#     # Step 3: Clustering with Agglomerative Clustering
+#     clustering_model = AgglomerativeClustering(n_clusters=None, distance_threshold=1.2, linkage='ward')
+#     labels = clustering_model.fit_predict(embeddings)
+
+#     # Step 4: Group Articles by Cluster
+#     subtopic_clusters = {}
+#     for i, label in enumerate(labels):
+#         subtopic_clusters.setdefault(label, []).append(articles[i])
+
+#     # Step 5: Concatenate Articles in Each Cluster
+#     cluster_texts = {cluster: " ".join(grouped_articles) for cluster, grouped_articles in subtopic_clusters.items()}
+
+#     # Step 6: Load BART large model for classification
+#     classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", framework="pt")
+
+#     # Step 7: Define Candidate Labels
+#     candidate_labels = [
+#         "Government", "Elections", "Foreign Policy", "Legislation", "Political Parties", 
+#         "Political Debates", "Protests & Movements", "Public Policy", "Corruption", "Political Scandals",
+        
+#       "Stock Market", "Business", "Inflation", "Trade", "Economic Policies", 
+#         "GDP & Growth Rate", "Unemployment", "Banking & Finance", "Real Estate", "International Trade",
+        
+#         "AI", "Cybersecurity", "Gadgets", "Space Exploration", "Internet & Connectivity", 
+#         "Robotics", "Blockchain & Cryptocurrency", "Quantum Computing", "Software & Programming", "5G & Telecommunications",
+        
+#         "Sports", "Cricket", "Football", "Tennis", "Badminton", "Olympics", 
+#         "Basketball", "Athletics", "Hockey", "Golf", "Wrestling",
+        
+#        "Medicine", "Pandemic", "Mental Health", "Nutrition", "Fitness & Exercise", 
+#         "Healthcare Policies", "Diseases & Vaccines", "Alternative Medicine", "Public Health", "Medical Research",
+        
+#         "Schools", "Universities", "Scholarships", "Research", "Online Learning", 
+#         "Examinations & Results", "Student Loans", "Educational Policies", "Teaching Methods", "EdTech",
+        
+#         "Law Enforcement", "Court Cases", "Scams & Frauds", "Violence", "Cybercrime", 
+#         "White-Collar Crime", "Drug Trafficking", "Kidnapping", "Human Trafficking", "Organized Crime",
+        
+#         "Startups", "Corporate News", "Mergers & Acquisitions", "Real Estate Market", "E-commerce", 
+#         "Small Businesses", "Investment Strategies", "Taxation Policies", "Supply Chain & Logistics", "Financial Scandals",
+        
+#         "Climate Change", "Renewable Energy", "Deforestation", "Wildlife Conservation", "Pollution & Air Quality", 
+#         "Ocean & Marine Life", "Natural Disasters", "Sustainable Development", "Carbon Emissions", "Water Crisis",
+        
+#         "Space Exploration", "Astronomy", "Physics", "Biology & Genetics", "Chemistry", 
+#         "Scientific Discoveries", "AI in Science", "Renewable Energy Technologies", "Geology & Earth Science", "Research & Innovations"
+#           "Movies & Cinema",
+#         "TV Shows & Series",
+#         "Music & Concerts",
+#         "Celebrity News & Gossip",
+#         "Awards & Red Carpet Events",
+#         "Streaming Platforms (Netflix, Disney+, etc.)",
+#         "Theater & Performing Arts",
+#         "Video Games & eSports",
+#         "Bollywood & Hollywood",
+#         "Comics & Animation"
+#     ]
+
+#     # Step 8: Classify Each Cluster and Assign the Closest Label
+#     final_clusters = {}
+
+#     for cluster, concatenated_text in cluster_texts.items():
+#         result = classifier(concatenated_text, candidate_labels, multi_label=False)  # Single best label
+#         best_label = result["labels"][0]  # The highest-scoring label
+        
+#         # Store articles under the best matching subtopic
+#         final_clusters.setdefault(best_label, []).extend(subtopic_clusters[cluster])
+
+#     # Step 9: Print Final Clustered Articles
+#     print("\n### Final Clustered Articles ###\n")
+#     for subtopic, articles in final_clusters.items():
+#         print(f"**Subtopic:** {subtopic}")
+#         print("Articles in this cluster:")
+#         for article in articles:
+#             print(f"- {article[:100]}...")  # Print first 100 characters for readability
+#         print("\n" + "-"*80 + "\n")
+
+
+
+# # Step 6: Summarize Each Cluster
+
+#     # DO AHEAD
+#     def recursive_summarize(text, min_tokens=MIN_CHUNK_TOKENS, max_tokens=MAX_CHUNK_TOKENS):
+#         all_tokens = tokenizer.encode(text, add_special_tokens=False)
+#         total_tokens = len(all_tokens)
+#         print(f"Total tokens: {total_tokens}")
+
+#         if total_tokens <= max_tokens:
+#             return text
+        
+#         full_chunks = total_tokens // max_tokens
+#         remainder = total_tokens % max_tokens
+        
+#         if full_chunks >= 1 and remainder < MIN_TOTAL_LAST:
+#             full_chunks -= 1
+#             start_last = full_chunks * max_tokens
+#             last_tokens = all_tokens[start_last:]
+#         else:
+#             start_last = full_chunks * max_tokens
+#             last_tokens = all_tokens[start_last:]
+
+#         chunks_tokens = []
+
+#         for i in range(full_chunks):
+#             chunk = all_tokens[i * max_tokens : (i + 1) * max_tokens]
+#             chunks_tokens.append(chunk)
+
+#         last_total = len(last_tokens)
+#         split_index = last_total // 2
+
+#         if split_index < min_tokens or (last_total - split_index) < min_tokens:
+#             split_index = min_tokens
+#             if last_total - split_index < min_tokens:
+#                 chunks_tokens.append(last_tokens)
+#             else:
+#                 chunks_tokens.append(last_tokens[:split_index])
+#                 chunks_tokens.append(last_tokens[split_index:])
+#         else:
+#             chunks_tokens.append(last_tokens[:split_index])
+#             chunks_tokens.append(last_tokens[split_index:])
+        
+#         chunks = [tokenizer.decode(chunk, skip_special_tokens=True) for chunk in chunks_tokens]
+#         print(f"Number of chunks: {len(chunks)}")
+#         for i, chunk in enumerate(chunks):
+#             chunk_len = len(tokenizer.encode(chunk, add_special_tokens=False))
+#             print(f"Chunk {i+1}: {chunk_len} tokens")
+
+#         chunk_summaries = []
+#         for i, chunk in enumerate(chunks):
+#             chunk_len = len(tokenizer.encode(chunk, add_special_tokens=False))
+#             print(f"\nSummarizing chunk {i+1}/{len(chunks)} (token length: {chunk_len})...")
+#             try:
+#                 summary_chunk = summarizer(
+#                     chunk,
+#                     max_length=600,
+#                     min_length=400,
+#                     do_sample=False,
+#                     truncation=True
+#                 )
+#                 chunk_summaries.append(summary_chunk[0]['summary_text'])
+#             except Exception as e:
+#                 print(f"Error summarizing chunk {i+1}: {e}")
+#                 chunk_summaries.append(chunk)
+        
+#         combined_summary = " ".join(chunk_summaries)
+#         print("\nCombined Intermediate Summary:")
+#         print(combined_summary)
+
+#         return recursive_summarize(combined_summary, min_tokens, max_tokens)
+    
+
+#     summarized_clusters = {}
+
+# # Iterate over each subtopic and its associated articles
+#     for subtopic, articles in final_clusters.items():
+#         print(f"**Processing Subtopic:** {subtopic}")
+
+#     # Summarize all articles under this subtopic
+#         summary = recursive_summarize(" ".join(articles), min_tokens=400, max_tokens=600)
+
+#     # Store the summarized result
+#         summarized_clusters[subtopic] = summary
+
+#         print(f"**Summary for {subtopic}:** {summary}\n")
+#         print("\n" + "-" * 80 + "\n")
+#     return (summarized_clusters, random_article_domain)
+
+      
+# # Step 6: Generate Summaries
+
+
+
+
+
+
+
+
+
+
+
+
+all_articles = load_json("extracted_articles.json")
+all_contents = []
+
+for article in all_articles:
+    all_contents.append(article.get("content"))
+
+def super_summary(articles):
     # Step 1: Convert Articles into Embeddings
     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
     embeddings = model.encode(articles, normalize_embeddings=True)
@@ -592,10 +846,16 @@ def generate_summary():
 
         print(f"**Summary for {subtopic}:** {summary}\n")
         print("\n" + "-" * 80 + "\n")
-    return (summarized_clusters, random_article_domain)
+    return summarized_clusters
 
-      
-# Step 6: Generate Summaries
+print(super_summary(all_contents))
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
