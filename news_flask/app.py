@@ -359,11 +359,11 @@ def get_random_article():
     WITH a, rand() AS random 
     ORDER BY random 
     LIMIT 1 
-    RETURN id(a) as article_id;
+    RETURN id(a) as article_id, a.domain AS domain;
     """
     with driver.session() as session:
         result = session.run(cypher_query)
-        return result.single["article_id"] if result else None
+        return (result.single["article_id"], result.single["domain"]) if result else None
     
 # Graph updation helper function
 def create_relationships_by_keywords(article_id, keywords_list):
@@ -399,7 +399,13 @@ topic_dict = {
     1: "sports",
     2: "technology",
     3: "politics",
-    4: "entertainment"
+    4: "entertainment",
+    5: "economy",
+    6: "healthcare",
+    7: "crime",
+    8: "education",
+    9: "environment",
+    10: "science"
 }
 
 @app.route("/cronjob", methods=['GET'])
@@ -414,10 +420,10 @@ def cronJob():
 
 @app.route("/generate-summary", methods=['GET'])
 def generate_summary():
-    random_article_id = get_random_article()
+    random_article_id, random_article_domain = get_random_article()
     neighbour_contents = get_related_articles_content(start_id=random_article_id)
     articles=neighbour_contents
-# Step 1: Convert Articles into Embeddings
+    # Step 1: Convert Articles into Embeddings
     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
     embeddings = model.encode(articles, normalize_embeddings=True)
 
