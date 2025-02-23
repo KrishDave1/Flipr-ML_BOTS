@@ -16,8 +16,10 @@ public class CronJobServiceImpl implements CronJobService {
     private RestTemplate restTemplate;
 
     @Override
-    @Scheduled(fixedRate = 300000)
+    @Scheduled(fixedRate = 120000)
     public void cronJob() {
+        System.out.println("Entered the pinging cron job.");
         ResponseEntity<String> response = restTemplate.getForEntity(CRON_JOB_URL, String.class);
+        System.out.println(response);
     }
 }

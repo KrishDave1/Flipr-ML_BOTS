@@ -14,8 +14,12 @@ public class SummaryServiceImpl implements  SummaryService {
     private final String SUMMARY_URL = "http://localhost:5000/generate-summary";
 
     @Override
-    @Scheduled(fixedRate = 600000)
+    @Scheduled(fixedRate = 300000)
     public void fetchSummary() {
+        System.out.println("Entered the fetch summary cron job.");
         ResponseEntity<Map> response = restTemplate.getForEntity(SUMMARY_URL, Map.class);
+        response.getBody().forEach((key, value) -> {
+            System.out.println(key + ":" + value);
+        });
     }
 }
