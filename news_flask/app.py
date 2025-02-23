@@ -438,35 +438,45 @@ def generate_summary():
 
     # Step 7: Define Candidate Labels
     candidate_labels = [
-        "Politics", "Government", "Elections", "Foreign Policy", "Legislation", "Political Parties", 
+        "Government", "Elections", "Foreign Policy", "Legislation", "Political Parties", 
         "Political Debates", "Protests & Movements", "Public Policy", "Corruption", "Political Scandals",
         
-        "Economy", "Stock Market", "Business", "Inflation", "Trade", "Economic Policies", 
+      "Stock Market", "Business", "Inflation", "Trade", "Economic Policies", 
         "GDP & Growth Rate", "Unemployment", "Banking & Finance", "Real Estate", "International Trade",
         
-        "Technology", "AI", "Cybersecurity", "Gadgets", "Space Exploration", "Internet & Connectivity", 
+        "AI", "Cybersecurity", "Gadgets", "Space Exploration", "Internet & Connectivity", 
         "Robotics", "Blockchain & Cryptocurrency", "Quantum Computing", "Software & Programming", "5G & Telecommunications",
         
         "Sports", "Cricket", "Football", "Tennis", "Badminton", "Olympics", 
         "Basketball", "Athletics", "Hockey", "Golf", "Wrestling",
         
-        "Health", "Medicine", "Pandemic", "Mental Health", "Nutrition", "Fitness & Exercise", 
+       "Medicine", "Pandemic", "Mental Health", "Nutrition", "Fitness & Exercise", 
         "Healthcare Policies", "Diseases & Vaccines", "Alternative Medicine", "Public Health", "Medical Research",
         
-        "Education", "Schools", "Universities", "Scholarships", "Research", "Online Learning", 
+        "Schools", "Universities", "Scholarships", "Research", "Online Learning", 
         "Examinations & Results", "Student Loans", "Educational Policies", "Teaching Methods", "EdTech",
         
-        "Crime", "Law Enforcement", "Court Cases", "Scams & Frauds", "Violence", "Cybercrime", 
+        "Law Enforcement", "Court Cases", "Scams & Frauds", "Violence", "Cybercrime", 
         "White-Collar Crime", "Drug Trafficking", "Kidnapping", "Human Trafficking", "Organized Crime",
         
-        "Business & Finance", "Startups", "Corporate News", "Mergers & Acquisitions", "Real Estate Market", "E-commerce", 
+        "Startups", "Corporate News", "Mergers & Acquisitions", "Real Estate Market", "E-commerce", 
         "Small Businesses", "Investment Strategies", "Taxation Policies", "Supply Chain & Logistics", "Financial Scandals",
         
-        "Environment & Climate", "Climate Change", "Renewable Energy", "Deforestation", "Wildlife Conservation", "Pollution & Air Quality", 
+        "Climate Change", "Renewable Energy", "Deforestation", "Wildlife Conservation", "Pollution & Air Quality", 
         "Ocean & Marine Life", "Natural Disasters", "Sustainable Development", "Carbon Emissions", "Water Crisis",
         
-        "Science & Space", "Space Exploration", "Astronomy", "Physics", "Biology & Genetics", "Chemistry", 
+        "Space Exploration", "Astronomy", "Physics", "Biology & Genetics", "Chemistry", 
         "Scientific Discoveries", "AI in Science", "Renewable Energy Technologies", "Geology & Earth Science", "Research & Innovations"
+          "Movies & Cinema",
+        "TV Shows & Series",
+        "Music & Concerts",
+        "Celebrity News & Gossip",
+        "Awards & Red Carpet Events",
+        "Streaming Platforms (Netflix, Disney+, etc.)",
+        "Theater & Performing Arts",
+        "Video Games & eSports",
+        "Bollywood & Hollywood",
+        "Comics & Animation"
     ]
 
     # Step 8: Classify Each Cluster and Assign the Closest Label
@@ -560,8 +570,25 @@ def generate_summary():
         print(combined_summary)
 
         return recursive_summarize(combined_summary, min_tokens, max_tokens)
+    
 
-    recursive_summarize(" ".join(articles))
+    summarized_clusters = {}
+
+# Iterate over each subtopic and its associated articles
+    for subtopic, articles in final_clusters.items():
+        print(f"**Processing Subtopic:** {subtopic}")
+
+    # Summarize all articles under this subtopic
+        summary = recursive_summarize(" ".join(articles), min_tokens=400, max_tokens=600)
+
+    # Store the summarized result
+        summarized_clusters[subtopic] = summary
+
+        print(f"**Summary for {subtopic}:** {summary}\n")
+        print("\n" + "-" * 80 + "\n")
+    return summarized_clusters
+
+      
 # Step 6: Generate Summaries
 
 
