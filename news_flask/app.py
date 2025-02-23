@@ -418,32 +418,76 @@ def generate_summary():
     neighbour_contents = get_related_articles_content(start_id=random_article_id)
     articles=neighbour_contents
 # Step 1: Convert Articles into Embeddings
-    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')  # More accurate model for long texts
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
     embeddings = model.encode(articles, normalize_embeddings=True)
 
-# Step 2: Clustering with Agglomerative Clustering
+    # Step 3: Clustering with Agglomerative Clustering
     clustering_model = AgglomerativeClustering(n_clusters=None, distance_threshold=1.2, linkage='ward')
     labels = clustering_model.fit_predict(embeddings)
 
-# Step 3: Group Articles by Cluster
+    # Step 4: Group Articles by Cluster
     subtopic_clusters = {}
     for i, label in enumerate(labels):
         subtopic_clusters.setdefault(label, []).append(articles[i])
 
-# Step 4: Generate Subtopic Names
-    subtopic_names = {}
-    for cluster, grouped_articles in subtopic_clusters.items():
-        subtopic_names[cluster] = grouped_articles[0][:50] + "..."  # Use first few words of first article as heading
+    # Step 5: Concatenate Articles in Each Cluster
+    cluster_texts = {cluster: " ".join(grouped_articles) for cluster, grouped_articles in subtopic_clusters.items()}
 
-# Step 5: Print Clusters Before Summarization
-    print("\n### Clustered Articles Before Summarization ###\n")
-    for cluster, grouped_articles in subtopic_clusters.items():
-        subtopic_heading = subtopic_names[cluster]
-        print(f"**Subtopic:** {subtopic_heading}")
+    # Step 6: Load BART large model for classification
+    classifier = pipeline("zero-shot-classification", model="facebook/bart-large-mnli", framework="pt")
+
+    # Step 7: Define Candidate Labels
+    candidate_labels = [
+        "Politics", "Government", "Elections", "Foreign Policy", "Legislation", "Political Parties", 
+        "Political Debates", "Protests & Movements", "Public Policy", "Corruption", "Political Scandals",
+        
+        "Economy", "Stock Market", "Business", "Inflation", "Trade", "Economic Policies", 
+        "GDP & Growth Rate", "Unemployment", "Banking & Finance", "Real Estate", "International Trade",
+        
+        "Technology", "AI", "Cybersecurity", "Gadgets", "Space Exploration", "Internet & Connectivity", 
+        "Robotics", "Blockchain & Cryptocurrency", "Quantum Computing", "Software & Programming", "5G & Telecommunications",
+        
+        "Sports", "Cricket", "Football", "Tennis", "Badminton", "Olympics", 
+        "Basketball", "Athletics", "Hockey", "Golf", "Wrestling",
+        
+        "Health", "Medicine", "Pandemic", "Mental Health", "Nutrition", "Fitness & Exercise", 
+        "Healthcare Policies", "Diseases & Vaccines", "Alternative Medicine", "Public Health", "Medical Research",
+        
+        "Education", "Schools", "Universities", "Scholarships", "Research", "Online Learning", 
+        "Examinations & Results", "Student Loans", "Educational Policies", "Teaching Methods", "EdTech",
+        
+        "Crime", "Law Enforcement", "Court Cases", "Scams & Frauds", "Violence", "Cybercrime", 
+        "White-Collar Crime", "Drug Trafficking", "Kidnapping", "Human Trafficking", "Organized Crime",
+        
+        "Business & Finance", "Startups", "Corporate News", "Mergers & Acquisitions", "Real Estate Market", "E-commerce", 
+        "Small Businesses", "Investment Strategies", "Taxation Policies", "Supply Chain & Logistics", "Financial Scandals",
+        
+        "Environment & Climate", "Climate Change", "Renewable Energy", "Deforestation", "Wildlife Conservation", "Pollution & Air Quality", 
+        "Ocean & Marine Life", "Natural Disasters", "Sustainable Development", "Carbon Emissions", "Water Crisis",
+        
+        "Science & Space", "Space Exploration", "Astronomy", "Physics", "Biology & Genetics", "Chemistry", 
+        "Scientific Discoveries", "AI in Science", "Renewable Energy Technologies", "Geology & Earth Science", "Research & Innovations"
+    ]
+
+    # Step 8: Classify Each Cluster and Assign the Closest Label
+    final_clusters = {}
+
+    for cluster, concatenated_text in cluster_texts.items():
+        result = classifier(concatenated_text, candidate_labels, multi_label=False)  # Single best label
+        best_label = result["labels"][0]  # The highest-scoring label
+        
+        # Store articles under the best matching subtopic
+        final_clusters.setdefault(best_label, []).extend(subtopic_clusters[cluster])
+
+    # Step 9: Print Final Clustered Articles
+    print("\n### Final Clustered Articles ###\n")
+    for subtopic, articles in final_clusters.items():
+        print(f"**Subtopic:** {subtopic}")
         print("Articles in this cluster:")
-        for article in grouped_articles:
+        for article in articles:
             print(f"- {article[:100]}...")  # Print first 100 characters for readability
-            print("\n" + "-"*80 + "\n")
+        print("\n" + "-"*80 + "\n")
+
 
 
 # Step 6: Summarize Each Cluster
