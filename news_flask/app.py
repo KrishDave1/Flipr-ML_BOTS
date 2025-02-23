@@ -363,7 +363,7 @@ def get_random_article():
     """
     with driver.session() as session:
         result = session.run(cypher_query)
-        return result.single["article_id"] if result else None
+        return (result.single["article_id"], result.single["domain"]) if result else None
     
 # Graph updation helper function
 def create_relationships_by_keywords(article_id, keywords_list):
@@ -420,7 +420,7 @@ def cronJob():
 
 @app.route("/generate-summary", methods=['GET'])
 def generate_summary():
-    random_article_id = get_random_article()
+    random_article_id, random_article_domain = get_random_article()
     neighbour_contents = get_related_articles_content(start_id=random_article_id)
     articles=neighbour_contents
     # Step 1: Convert Articles into Embeddings
