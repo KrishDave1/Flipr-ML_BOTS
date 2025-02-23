@@ -10,6 +10,10 @@ from flask import Flask, request, jsonify
 from transformers import pipeline, AutoTokenizer, AutoModel
 from neo4j import GraphDatabase
 from scipy.spatial.distance import cosine
+from sentence_transformers import SentenceTransformer
+from sklearn.cluster import AgglomerativeClustering
+from transformers import pipeline, AutoTokenizer
+
 import numpy as np
 import random
 # Summarizer starts
@@ -412,6 +416,35 @@ def cronJob():
 def generate_summary():
     random_article_id = get_random_article()
     neighbour_contents = get_related_articles_content(start_id=random_article_id)
+    
+# Step 1: Convert Articles into Embeddings
+    model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')  # More accurate model for long texts
+    embeddings = model.encode(articles, normalize_embeddings=True)
+
+# Step 2: Clustering with Agglomerative Clustering
+    clustering_model = AgglomerativeClustering(n_clusters=None, distance_threshold=1.2, linkage='ward')
+    labels = clustering_model.fit_predict(embeddings)
+
+# Step 3: Group Articles by Cluster
+    subtopic_clusters = {}
+    for i, label in enumerate(labels):
+        subtopic_clusters.setdefault(label, []).append(articles[i])
+
+# Step 4: Generate Subtopic Names
+    subtopic_names = {}
+    for cluster, grouped_articles in subtopic_clusters.items():
+        subtopic_names[cluster] = grouped_articles[0][:50] + "..."  # Use first few words of first article as heading
+
+# Step 5: Print Clusters Before Summarization
+    print("\n### Clustered Articles Before Summarization ###\n")
+    for cluster, grouped_articles in subtopic_clusters.items():
+        subtopic_heading = subtopic_names[cluster]
+        print(f"**Subtopic:** {subtopic_heading}")
+        print("Articles in this cluster:")
+        for article in grouped_articles:
+            print(f"- {article[:100]}...")  # Print first 100 characters for readability
+            print("\n" + "-"*80 + "\n")
+
     # DO AHEAD
 
 if __name__ == "__main__":
