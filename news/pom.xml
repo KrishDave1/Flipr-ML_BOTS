@@ -50,11 +50,16 @@
 			<artifactId>neo4j-java-driver</artifactId>
 		</dependency>
 
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+
 		<!-- Lombok for Reducing Boilerplate Code -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
-			<optional>true</optional>
+			<scope>provided</scope>
 		</dependency>
 
 		<!-- JWT Authentication Dependencies -->
@@ -116,6 +121,13 @@
 							<artifactId>lombok</artifactId>
 						</exclude>
 					</excludes>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
 				</configuration>
 			</plugin>
 		</plugins>
