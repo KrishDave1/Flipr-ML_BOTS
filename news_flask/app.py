@@ -359,7 +359,7 @@ def get_random_article():
     WITH a, rand() AS random 
     ORDER BY random 
     LIMIT 1 
-    RETURN id(a) as article_id;
+    RETURN id(a) as article_id, a.domain AS domain;
     """
     with driver.session() as session:
         result = session.run(cypher_query)
