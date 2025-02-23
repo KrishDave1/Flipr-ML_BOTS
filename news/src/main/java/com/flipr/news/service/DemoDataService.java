@@ -1,13 +1,7 @@
 package com.flipr.news.service;
 
-import com.flipr.news.entity.Article;
-import com.flipr.news.enums.Domain;
 import com.flipr.news.repository.ArticleRepository;
-import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 public class DemoDataService {
