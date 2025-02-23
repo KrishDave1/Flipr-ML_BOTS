@@ -11,28 +11,15 @@ import org.springframework.web.client.RestTemplate;
 @Service
 public class CronJobServiceImpl implements CronJobService {
     private static final String CRON_JOB_URL = "http://localhost:5000/cronjob";
-    private static final String SUMMARY_URL = "http://localhost:5000/generate-summary";
 
     @Autowired
     private RestTemplate restTemplate;
 
     @Override
-    @Scheduled(fixedRate = 300000)
+    @Scheduled(fixedRate = 120000)
     public void cronJob() {
-        try {
-            ResponseEntity<String> response = restTemplate.getForEntity(CRON_JOB_URL, String.class);
-        } catch (Exception e) {
-            log.error(String.valueOf(e));
-        }
-    }
-
-    @Override
-    @Scheduled(fixedRate = 600000)
-    public void summaryCronJob() {
-        try {
-            ResponseEntity<String> response = restTemplate.getForEntity(SUMMARY_URL, String.class);
-        } catch (Exception e) {
-            log.error(String.valueOf(e));
-        }
+        System.out.println("Entered the pinging cron job.");
+        ResponseEntity<String> response = restTemplate.getForEntity(CRON_JOB_URL, String.class);
+        System.out.println(response);
     }
 }

@@ -592,7 +592,7 @@ def generate_summary():
 
         print(f"**Summary for {subtopic}:** {summary}\n")
         print("\n" + "-" * 80 + "\n")
-    return summarized_clusters
+    return (summarized_clusters, random_article_domain)
 
       
 # Step 6: Generate Summaries
