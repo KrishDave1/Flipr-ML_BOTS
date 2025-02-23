@@ -1,3 +1,5 @@
 *.pyc
 flipr-env/
 fliprenv
+.next
+node_modules
