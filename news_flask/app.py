@@ -399,7 +399,13 @@ topic_dict = {
     1: "sports",
     2: "technology",
     3: "politics",
-    4: "entertainment"
+    4: "entertainment",
+    5: "economy",
+    6: "healthcare",
+    7: "crime",
+    8: "education",
+    9: "environment",
+    10: "science"
 }
 
 @app.route("/cronjob", methods=['GET'])
@@ -417,7 +423,7 @@ def generate_summary():
     random_article_id = get_random_article()
     neighbour_contents = get_related_articles_content(start_id=random_article_id)
     articles=neighbour_contents
-# Step 1: Convert Articles into Embeddings
+    # Step 1: Convert Articles into Embeddings
     model = SentenceTransformer('sentence-transformers/all-mpnet-base-v2')
     embeddings = model.encode(articles, normalize_embeddings=True)
 
