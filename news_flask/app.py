@@ -26,7 +26,8 @@ import re
 # Summarizer starts
 
 from sentence_transformers import SentenceTransformer
-model_sentence_transformer = SentenceTransformer("all-mpnet-base-v2")
+# Load a pre-trained embedding model
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 from transformers import pipeline
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
@@ -414,18 +415,17 @@ def create_relationships_by_keywords(article_id):
     with driver.session() as session:
         session.run(query, article_id=article_id)
 
-def save_article(keywords, content, domain):
+def save_article(content, domain):
     """Saves an Article instance into Neo4j with an auto-generated ID and returns the ID."""
     query = """
     CREATE (a:Article {
-        keywords: $keywords,
         content: $content,
         domain: $domain
     })
     RETURN elementId(a) AS id;
     """
     with driver.session() as session:
-        result = session.run(query, keywords=keywords, content=content, domain=domain)
+        result = session.run(query, content=content, domain=domain)
         record = result.single()
         return record["id"] if record else None
 
@@ -442,6 +442,88 @@ topic_dict = {
     9: "environment",
     10: "science"
 }
+
+def create_knn_relationships(graph_name="article-similarity-graph", top_k=5, similarity_threshold=-0.9):
+    """
+    Runs KNN similarity search in Neo4j GDS and creates relationships between similar articles.
+    """
+    with driver.session() as session:
+        # Step 1: Check if Graph Projection Exists
+        print("[INFO] Checking if Graph Projection Exists...")
+        result = session.run("""
+        CALL gds.graph.exists($graph_name) YIELD exists
+        RETURN exists
+        """, graph_name=graph_name).single()
+
+        graph_exists = result["exists"] if result else False  # Ensure proper handling if result is None
+
+        # Step 2: Drop Graph Projection Only If It Exists
+        if graph_exists:
+            print("[INFO] Dropping existing Graph Projection...")
+            session.run("""
+            CALL gds.graph.drop($graph_name) YIELD graphName
+            """, graph_name=graph_name)
+        else:
+            print("[INFO] No existing Graph Projection found. Skipping drop.")
+
+        # Step 3: Create Graph Projection Using Only Nodes
+        print("[INFO] Creating Graph Projection with only Nodes...")
+        session.run("""
+        CALL gds.graph.project(
+            $graph_name,
+            'Article', 
+            '*',  // No explicit relationships needed
+            { nodeProperties: ['embedding'] }  // Ensure embedding property is included
+        )
+        """, graph_name=graph_name)
+
+        # Step 4: Run KNN Similarity Search and Create Relationships
+        print("[INFO] Running KNN Similarity Search and writing results as relationships...")
+        session.run("""
+        CALL gds.knn.write($graph_name, {
+            nodeProperties: 'embedding',
+            topK: $top_k,
+            similarityMetric: 'COSINE',
+            writeProperty: 'similarity',
+            relationshipType: 'SIMILAR_TO',
+            relationshipProperty: 'score'
+        })
+        """, graph_name=graph_name, top_k=top_k)
+
+    print("[SUCCESS] KNN Similarity Relationships Created Successfully!")
+
+def generate_and_store_embeddings():
+    with driver.session() as session:
+        # Step 1: Retrieve all articles that don't have embeddings
+        query = """
+        MATCH (a:Article)
+        WHERE a.embedding IS NULL
+        RETURN elementId(a) AS id, a.content AS content
+        """
+        articles = session.run(query)
+
+        for record in articles:
+            article_id = record["id"]
+            content = record["content"]
+
+            # Skip if ID is None
+            if not article_id:
+                print("[WARNING] Skipping article because ID is None")
+                continue
+
+            # Step 2: Generate embedding
+            embedding = embedding_model.encode(content).tolist()
+
+            # Step 3: Store the embedding in Neo4j
+            session.run(
+                "MATCH (a) WHERE elementId(a) = $id SET a.embedding = $embedding",
+                id=article_id,
+                embedding=embedding
+            )
+            print(f"[INFO] Processed Article ID: {article_id}")
+
+    print("[SUCCESS] All embeddings generated and stored!")
+
 
 @app.route("/")
 def home():
@@ -460,9 +542,11 @@ def cronJob():
         count += 1
         print(f"COUNT = {count}")
         # keywords = do_ner_and_extract_keywords(article.get("content"))
-        para_embedding = model_sentence_transformer.encode(article.get("content"))
-        saved_article_id = save_article(keywords=para_embedding, content=article.get("content"), domain=topic_dict[topic_num])
-        create_relationships_by_keywords(article_id=saved_article_id)
+        # para_embedding = model_sentence_transformer.encode(article.get("content"))
+        saved_article_id = save_article(content=article.get("content"), domain=topic_dict[topic_num])
+        # create_relationships_by_keywords(article_id=saved_article_id)
+    generate_and_store_embeddings()
+    create_knn_relationships()
     return jsonify({
         "message": "HELLO FROM FLASK."
     })
